@@ -1,8 +1,7 @@
 /build/
 /out/
 /src/
-*.tar.gz
-*.tar.xz
+/downloads/
 *.deb
 vmlinuz
 Image
@@ -10,5 +9,8 @@ Image
 lib/modules/
 .config
 .config.old
-/kernel/
+
+# Каталог не исключаем целиком, иначе отрицание ниже не сработает:
+# git не возвращает файлы из исключённого каталога.
+/kernel/*
 !/kernel/*.sha256
