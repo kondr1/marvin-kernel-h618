@@ -89,9 +89,11 @@ make -C "$src" O="$build" ARCH="$ARCH" CROSS_COMPILE="$CROSS_COMPILE" \
 	-j"$(nproc)" Image modules
 
 # Собирается только наш DTB: полный `dtbs` компилирует сотни чужих плат.
+# Путь указывается относительно arch/$ARCH/boot/dts — kbuild добавляет
+# префикс сам, полный путь он склеит сам с собой и не найдёт цель.
 step "Сборка DTB платы"
 make -C "$src" O="$build" ARCH="$ARCH" CROSS_COMPILE="$CROSS_COMPILE" \
-	"arch/arm64/boot/dts/allwinner/$board_dtb.dtb"
+	"allwinner/$board_dtb.dtb"
 
 # --- 5. Проверки -------------------------------------------------------------
 step "Проверки"
