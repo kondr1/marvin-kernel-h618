@@ -104,6 +104,7 @@ jobs:
           path: |
             out/vmlinuz
             out/vmlinuz.sha256
+            out/*.dtb
             out/config
             out/System.map
             out/build-info.yaml
