@@ -94,7 +94,14 @@ image="$uboot_src/u-boot-sunxi-with-spl.bin"
 	exit 1
 }
 
-# --- 3. Артефакты ------------------------------------------------------------
+# --- 3. boot.scr -------------------------------------------------------------
+# mkimage берётся из только что собранного U-Boot: версия инструмента и
+# версия загрузчика тогда заведомо совпадают.
+step "boot.scr"
+"$uboot_src/tools/mkimage" -C none -A arm64 -T script \
+	-d "$root/uboot/boot.cmd" "$out/boot.scr"
+
+# --- 4. Артефакты ------------------------------------------------------------
 step "Артефакты"
 cp "$image" "$out/u-boot-sunxi-with-spl.bin"
 sha=$(sha256sum "$out/u-boot-sunxi-with-spl.bin" | cut -d' ' -f1)
@@ -111,7 +118,8 @@ artifact_sha256: $sha
 build_container_digest: ${BUILD_CONTAINER_DIGEST:-unknown}
 notes: >
   Платы нет в upstream U-Boot: defconfig и DTS наши. Загрузка на железе не
-  проверялась — образ пишется на microSD со смещением 8 КиБ.
+  проверялась. Образ пишется на microSD со смещением 8 КиБ:
+  dd if=u-boot-sunxi-with-spl.bin of=/dev/sdX bs=1024 seek=8 conv=fsync
 EOF
 
 ls -l "$out/u-boot-sunxi-with-spl.bin"

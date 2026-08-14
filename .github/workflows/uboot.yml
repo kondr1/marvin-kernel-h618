@@ -84,4 +84,5 @@ jobs:
           path: |
             out/u-boot-sunxi-with-spl.bin
             out/u-boot-sunxi-with-spl.bin.sha256
+            out/boot.scr
             out/uboot-build-info.yaml
