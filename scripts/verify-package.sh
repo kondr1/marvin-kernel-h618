@@ -36,8 +36,9 @@ fi
 
 # Без firmware онбордовое радио не поднимется, а выяснится это только на
 # плате: драйвер загрузится и молча не найдёт устройство.
-for fw in brcmfmac43455-sdio.bin brcmfmac43455-sdio.clm_blob; do
-	[ -f "$pkg/lib/firmware/brcm/$fw" ] || fail "нет firmware brcm/$fw"
+for fw in brcm/brcmfmac43455-sdio.bin brcm/brcmfmac43455-sdio.clm_blob \
+	rtw88/rtw8812a_fw.bin rtlwifi/rtl8188eufw.bin; do
+	[ -f "$pkg/lib/firmware/$fw" ] || fail "нет firmware $fw"
 done
 ls "$pkg"/lib/firmware/brcm/brcmfmac43455-sdio.*.txt >/dev/null 2>&1 ||
 	fail "нет board-NVRAM brcmfmac43455-sdio.<compatible>.txt"

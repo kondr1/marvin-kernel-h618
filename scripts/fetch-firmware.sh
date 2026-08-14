@@ -11,12 +11,16 @@
 set -euo pipefail
 
 ARMBIAN_COMMIT=${ARMBIAN_COMMIT:-f49ca1169c8eaea80658de3752ab6e2b4bc1ac40}
+FIRMWARE_COMMIT=${FIRMWARE_COMMIT:-d9846710f54da5e4383e2d67311819659ac2cf5c}
 BASE="https://raw.githubusercontent.com/armbian/build/$ARMBIAN_COMMIT"
+FW_BASE="https://raw.githubusercontent.com/armbian/firmware/$FIRMWARE_COMMIT"
 
 root=$(cd "$(dirname "$0")/.." && pwd)
 manifest="$root/firmware/brcm.manifest"
+wifi_manifest="$root/firmware/wifi.manifest"
 sums="$root/firmware/brcm.sha256"
-out="$root/out/firmware/lib/firmware/brcm"
+fwroot="$root/out/firmware/lib/firmware"
+out="$fwroot/brcm"
 
 mkdir -p "$out"
 printf '\n== Firmware brcmfmac (Armbian @ %s)\n' "${ARMBIAN_COMMIT:0:12}"
@@ -38,6 +42,20 @@ while read -r target source; do
 	printf '%s  %s\n' "$sha" "$target" >> "$tmp/computed.sha256"
 	printf '  %s (%s байт)\n' "$target" "$(stat -c%s "$out/$target")"
 done < "$manifest"
+
+printf '\n== Firmware адаптеров (armbian/firmware @ %s)\n' "${FIRMWARE_COMMIT:0:12}"
+while read -r origin source target; do
+	case "$origin" in
+	'#'* | '') continue ;;
+	esac
+
+	mkdir -p "$fwroot/$(dirname "$target")"
+	curl -fsSL -o "$fwroot/$target" "$FW_BASE/$source"
+
+	sha=$(sha256sum "$fwroot/$target" | cut -d' ' -f1)
+	printf '%s  %s\n' "$sha" "$target" >> "$tmp/computed.sha256"
+	printf '  %s (%s байт)\n' "$target" "$(stat -c%s "$fwroot/$target")"
+done < "$wifi_manifest"
 
 # Тот же принцип, что и с исходниками: пин работает, только если суммы лежат
 # в репозитории. Первая загрузка их печатает, дальше они сверяются.
