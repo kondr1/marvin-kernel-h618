@@ -1,0 +1,87 @@
+name: uboot
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - uboot/**
+      - dts/**
+      - scripts/build-uboot.sh
+      - container.digest
+      - .github/workflows/uboot.yml
+  pull_request:
+    paths:
+      - uboot/**
+      - dts/**
+      - scripts/build-uboot.sh
+  workflow_dispatch:
+
+concurrency:
+  group: uboot-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: inputs
+        run: |
+          # Всё, что влияет на артефакт. Забытый каталог означает выдачу
+          # устаревшего загрузчика из кеша при изменённых входах.
+          key=$(cat Dockerfile container.digest uboot/* dts/* \
+                scripts/build-uboot.sh 2>/dev/null | sha256sum | cut -c1-16)
+          echo "key=$key" >> "$GITHUB_OUTPUT"
+
+      - id: artifact
+        uses: actions/cache@v4
+        with:
+          path: out
+          key: uboot-artifact-${{ steps.inputs.outputs.key }}
+
+      - if: steps.artifact.outputs.cache-hit != 'true'
+        uses: actions/cache@v4
+        with:
+          path: downloads
+          key: uboot-src-${{ hashFiles('uboot/*.sha256') }}
+          restore-keys: uboot-src-
+
+      - if: steps.artifact.outputs.cache-hit != 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Сборка
+        if: steps.artifact.outputs.cache-hit != 'true'
+        run: |
+          image=$(cat container.digest)
+          docker run --rm \
+            -v "$PWD:/work" -w /work \
+            -e BUILD_CONTAINER_DIGEST="$image" \
+            "$image" bash scripts/build-uboot.sh
+
+      - name: Проверка артефакта
+        run: |
+          test -f out/u-boot-sunxi-with-spl.bin
+          # SPL пустого размера означает, что BL31 не встроился.
+          size=$(stat -c%s out/u-boot-sunxi-with-spl.bin)
+          echo "размер образа: $size байт"
+          [ "$size" -gt 200000 ] || { echo "образ подозрительно мал" >&2; exit 1; }
+          cd out && sha256sum -c u-boot-sunxi-with-spl.bin.sha256
+          cat uboot-build-info.yaml
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: uboot-${{ steps.inputs.outputs.key }}
+          path: |
+            out/u-boot-sunxi-with-spl.bin
+            out/u-boot-sunxi-with-spl.bin.sha256
+            out/uboot-build-info.yaml

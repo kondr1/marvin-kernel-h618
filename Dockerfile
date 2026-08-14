@@ -15,10 +15,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 	libssl-dev libelf-dev \
 	dwarves \
 	cpio kmod rsync \
-	xz-utils curl ca-certificates \
+	xz-utils bzip2 curl ca-certificates \
 	gnupg \
 	ccache \
 	python3 \
+	`# сборка U-Boot и TF-A: свои требования сверх ядерных` \
+	python3-dev python3-setuptools swig \
+	uuid-dev libgnutls28-dev device-tree-compiler \
 	&& rm -rf /var/lib/apt/lists/*
 
 ENV ARCH=arm64
