@@ -1,6 +1,12 @@
 // SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
  * Copyright (c) 2025 Patrick Yavitz <pyavitz@armbian.com>
+ *
+ * Изменено для Marvin: убраны узлы, которых нет в mainline 6.18 (аудиохаб,
+ * дисплей с HDMI, второй Ethernet) и отключённая периферия, ссылавшаяся на
+ * pinctrl-определения из патч-сета Armbian (i2c1/3/4, uart1/4/5, spi0/1, ir).
+ * Оригинал собирается только поверх патчей Armbian; здесь нужен файл,
+ * собирающийся на mainline.
  */
 
 /dts-v1/;
@@ -20,17 +26,10 @@
 
 	chosen {
 		stdout-path = "serial0:115200n8";
-		kaslr-seed = <0xfeedbeef 0xc0def00d>;
 	};
 
-	/*
-	 * HDMI-разъём и дисплейный движок убраны: устройство безголовое, консоль
-	 * на serial. В mainline 6.18 узлов de/hdmi для H616 всё равно нет — они
-	 * приходят из патч-сета Armbian, который мы не тянем.
-	 */
-
 	reg_usb_vbus: regulator-usb-vbus {
-		/* Separate discrete regulator for the USB ports */
+		/* Отдельный регулятор на USB-порты */
 		compatible = "regulator-fixed";
 		regulator-min-microvolt = <5000000>;
 		regulator-max-microvolt = <5000000>;
@@ -39,7 +38,7 @@
 	};
 
 	reg_vcc5v: regulator-vcc5v {
-		/* Board wide 5V supply directly from the USB-C socket */
+		/* 5 В с разъёма USB-C на всю плату */
 		compatible = "regulator-fixed";
 		regulator-always-on;
 		regulator-min-microvolt = <5000000>;
@@ -80,37 +79,7 @@
 	cpu-supply = <&reg_dcdc2>;
 };
 
-&i2c0 {
-	status = "disabled";
-	pinctrl-0 = <&i2c0_pins>;
-	pinctrl-names = "default";
-};
-
-&i2c1 {
-	status = "disabled";
-	pinctrl-0 = <&i2c1_pi_pins>;
-	pinctrl-names = "default";
-};
-
-&i2c3 {
-	status = "disabled";
-	pinctrl-0 = <&i2c3_pg_pins>;
-	pinctrl-names = "default";
-};
-
-&i2c4 {
-	status = "disabled";
-	pinctrl-0 = <&i2c4_pg_pins>;
-	pinctrl-names = "default";
-};
-
-&ir {
-	status = "disabled";
-	pinctrl-0 = <&ir_rx_pin>;
-	pinctrl-names = "default";
-};
-
-/* SD card */
+/* SD-карта: с неё идёт первичная загрузка при bring-up. */
 &mmc0 {
 	status = "okay";
 	bus-width = <4>;
@@ -143,7 +112,6 @@
 	vcc-ph-supply = <&reg_dldo1>;
 	vcc-pi-supply = <&reg_dldo1>;
 
-	/* PC0 required for spi0 */
 	mmc2_pins: mmc2-pins {
 		pins = "PC1", "PC5", "PC6",
 		       "PC8", "PC9", "PC10", "PC11",
@@ -154,6 +122,8 @@
 	};
 };
 
+/* PMIC: задаёт напряжения CPU, DRAM и линий ввода-вывода. Без него плата
+ * не поднимется — это не опциональная периферия. */
 &r_i2c {
 	status = "okay";
 	axp313: pmic@36 {
@@ -206,50 +176,9 @@
 	};
 };
 
-&spi0 {
-	status = "disabled";
-	pinctrl-0 = <&spi0_pins>, <&spi1_cs0_pin>;
-	pinctrl-names = "default";
-
-	spidev@1 {
-		compatible = "rohm,dh2228fv";
-		reg = <1>;
-		spi-max-frequency = <1000000>;
-	};
-};
-
-&spi1 {
-	status = "disabled";
-	pinctrl-0 = <&spi1_pins>, <&spi1_cs1_pin>;
-	pinctrl-names = "default";
-
-	spidev@1 {
-		compatible = "rohm,dh2228fv";
-		reg = <1>;
-		spi-max-frequency = <1000000>;
-	};
-};
-
+/* Консоль bring-up. Скорость зафиксирована в chosen/stdout-path. */
 &uart0 {
 	status = "okay";
 	pinctrl-0 = <&uart0_ph_pins>;
-	pinctrl-names = "default";
-};
-
-&uart1 {
-	status = "disabled";
-	pinctrl-0 = <&uart1_pins>;
-	pinctrl-names = "default";
-};
-
-&uart4 {
-	status = "disabled";
-	pinctrl-0 = <&uart4_pi_pins>;
-	pinctrl-names = "default";
-};
-
-&uart5 {
-	status = "disabled";
-	pinctrl-0 = <&uart5_pins>;
 	pinctrl-names = "default";
 };
