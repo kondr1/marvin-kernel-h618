@@ -34,6 +34,14 @@ if [ -n "$modules_dir" ]; then
 	echo "модулей: $count"
 fi
 
+# Без firmware онбордовое радио не поднимется, а выяснится это только на
+# плате: драйвер загрузится и молча не найдёт устройство.
+for fw in brcmfmac43455-sdio.bin brcmfmac43455-sdio.clm_blob; do
+	[ -f "$pkg/lib/firmware/brcm/$fw" ] || fail "нет firmware brcm/$fw"
+done
+ls "$pkg"/lib/firmware/brcm/brcmfmac43455-sdio.*.txt >/dev/null 2>&1 ||
+	fail "нет board-NVRAM brcmfmac43455-sdio.<compatible>.txt"
+
 # Ядро arm64 начинается с магии 'ARM\x64' по смещению 56 — быстрая проверка,
 # что это действительно образ нужной архитектуры, а не чужой файл.
 if [ -f "$pkg/vmlinuz" ]; then

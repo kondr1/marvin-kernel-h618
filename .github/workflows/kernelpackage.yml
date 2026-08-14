@@ -52,8 +52,8 @@ jobs:
       - id: keys
         run: |
           kern=$(cat Dockerfile container.digest config/* dts/* kernel/* \
-                 scripts/build-kernel.sh scripts/verify-kernel.sh \
-                 2>/dev/null | sha256sum | cut -c1-16)
+                 firmware/* scripts/build-kernel.sh scripts/verify-kernel.sh \
+                 scripts/fetch-firmware.sh 2>/dev/null | sha256sum | cut -c1-16)
           boot=$(cat Dockerfile container.digest uboot/* dts/* \
                  scripts/build-uboot.sh 2>/dev/null | sha256sum | cut -c1-16)
           echo "kernel=$kern" >> "$GITHUB_OUTPUT"
@@ -99,6 +99,14 @@ jobs:
             -v "$HOME/.ccache:/root/.ccache" -e CCACHE_MAXSIZE=2G \
             -e BUILD_CONTAINER_DIGEST="$image" \
             "$image" bash scripts/build-kernel.sh
+
+      # Скачивается всегда: файлы маленькие, а отсутствие firmware
+      # обнаружилось бы только на плате молчащим радио.
+      - name: Firmware
+        run: |
+          image=$(cat container.digest)
+          docker run --rm -v "$PWD:/work" -w /work \
+            "$image" bash scripts/fetch-firmware.sh
 
       - name: Сборка загрузчика
         if: steps.uboot-cache.outputs.cache-hit != 'true'

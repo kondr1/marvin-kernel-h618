@@ -49,6 +49,16 @@ cp "$kernel_out"/*.dtb "$pkg/"
 cp "$kernel_out/config" "$pkg/"
 cp "$kernel_out/System.map" "$pkg/"
 cp -r "$kernel_out/lib" "$pkg/"
+
+# Firmware кладётся в тот же lib/, что и модули: gokrazy копирует каталог в
+# rootfs целиком, а драйвер ищет файлы уже после монтирования.
+if [ -d "$root/out/firmware/lib/firmware" ]; then
+	mkdir -p "$pkg/lib/firmware"
+	cp -r "$root/out/firmware/lib/firmware/." "$pkg/lib/firmware/"
+else
+	echo "ВНИМАНИЕ: firmware не скачано, радио BCM43455 не заработает"
+fi
+
 cp "$uboot_out/u-boot-sunxi-with-spl.bin" "$pkg/"
 cp "$uboot_out/boot.scr" "$pkg/"
 
