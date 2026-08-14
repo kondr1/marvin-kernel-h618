@@ -57,6 +57,21 @@ if [ ! -d "$src" ]; then
 	tar -xf "$tarball" -C "$root/src"
 fi
 
+# --- 2a. DTS платы -----------------------------------------------------------
+# Платы нет в mainline, поэтому DTS кладём в дерево сами. Файлы взяты из
+# Armbian (GPL-2.0+ OR MIT, авторство сохранено в заголовках) — писать их с
+# нуля незачем, там уже разобрана распиновка.
+step "DTS платы"
+dts_dir="$src/arch/arm64/boot/dts/allwinner"
+board_dtb="sun50i-h618-bananapi-m4-zero"
+
+cp "$root"/dts/*.dts "$root"/dts/*.dtsi "$dts_dir/"
+
+# Без записи в Makefile kbuild про наш DTS не знает.
+if ! grep -q "$board_dtb.dtb" "$dts_dir/Makefile"; then
+	echo "dtb-\$(CONFIG_ARCH_SUNXI) += $board_dtb.dtb" >> "$dts_dir/Makefile"
+fi
+
 # --- 3. Конфигурация ---------------------------------------------------------
 # Сборка идёт out-of-tree (O=), чтобы дерево исходников оставалось чистым и
 # кешировалось отдельно от результатов.
@@ -73,6 +88,11 @@ step "Сборка ядра"
 make -C "$src" O="$build" ARCH="$ARCH" CROSS_COMPILE="$CROSS_COMPILE" \
 	-j"$(nproc)" Image modules
 
+# Собирается только наш DTB: полный `dtbs` компилирует сотни чужих плат.
+step "Сборка DTB платы"
+make -C "$src" O="$build" ARCH="$ARCH" CROSS_COMPILE="$CROSS_COMPILE" \
+	"arch/arm64/boot/dts/allwinner/$board_dtb.dtb"
+
 # --- 5. Проверки -------------------------------------------------------------
 step "Проверки"
 READELF="${CROSS_COMPILE}readelf" "$root/scripts/verify-kernel.sh" "$build"
@@ -86,6 +106,7 @@ mkdir -p "$out/lib/modules"
 cp "$build/arch/arm64/boot/Image" "$out/vmlinuz"
 cp "$build/.config" "$out/config"
 cp "$build/System.map" "$out/System.map"
+cp "$build/arch/arm64/boot/dts/allwinner/$board_dtb.dtb" "$out/"
 
 make -C "$src" O="$build" ARCH="$ARCH" CROSS_COMPILE="$CROSS_COMPILE" \
 	INSTALL_MOD_PATH="$out" modules_install >/dev/null
@@ -101,10 +122,12 @@ source_sha256: $sha256
 vmlinuz_sha256: $vmlinuz_sha
 build_container_digest: ${BUILD_CONTAINER_DIGEST:-unknown}
 btf: present
-board_support: none
+board_dtb: $board_dtb.dtb
+board_dtb_source: armbian (GPL-2.0+ OR MIT)
+board_support: dtb-only
 notes: >
-  DTS BPI-M4 Zero и конфиг U-Boot в mainline отсутствуют и добавляются
-  отдельным шагом; этот артефакт содержит только ядро и модули.
+  DTS взят из Armbian и в mainline отсутствует. Конфиг U-Boot для платы ещё
+  не добавлен, поэтому загрузка на железе не проверялась.
 EOF
 
 echo "$vmlinuz_sha  vmlinuz" > "$out/vmlinuz.sha256"
