@@ -1,0 +1,14 @@
+/build/
+/out/
+/src/
+*.tar.gz
+*.tar.xz
+*.deb
+vmlinuz
+Image
+*.dtb
+lib/modules/
+.config
+.config.old
+/kernel/
+!/kernel/*.sha256

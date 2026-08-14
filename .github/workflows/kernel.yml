@@ -1,0 +1,105 @@
+name: kernel
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - config/**
+      - scripts/**
+      - kernel/**
+      - container.digest
+      - .github/workflows/kernel.yml
+  pull_request:
+    paths:
+      - config/**
+      - scripts/**
+      - container.digest
+  workflow_dispatch:
+
+# Коммит с обновлённым container.digest делает workflow "container" под
+# GITHUB_TOKEN, а такие пуши не запускают другие workflow. После бампа digest
+# сборку запускать вручную: gh workflow run kernel.yml
+
+concurrency:
+  group: kernel-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      # Артефактный слой: при неизменных входах сборка не запускается вовсе.
+      # Для ядра это разница между десятками минут и одной.
+      - id: inputs
+        run: |
+          key=$(cat Dockerfile container.digest config/* scripts/* kernel/* \
+                2>/dev/null | sha256sum | cut -c1-16)
+          echo "key=$key" >> "$GITHUB_OUTPUT"
+
+      - id: artifact
+        uses: actions/cache@v4
+        with:
+          path: out
+          key: kernel-artifact-${{ steps.inputs.outputs.key }}
+
+      # Тарболл ядра — 150 МБ, качать его повторно незачем.
+      - if: steps.artifact.outputs.cache-hit != 'true'
+        uses: actions/cache@v4
+        with:
+          path: downloads
+          key: kernel-src-${{ hashFiles('kernel/*.sha256') }}
+          restore-keys: kernel-src-
+
+      # ccache ограничен явно: он не должен вытеснять артефактный слой,
+      # который экономит больше.
+      - if: steps.artifact.outputs.cache-hit != 'true'
+        uses: actions/cache@v4
+        with:
+          path: ~/.ccache
+          key: kernel-ccache-${{ steps.inputs.outputs.key }}
+          restore-keys: kernel-ccache-
+
+      - if: steps.artifact.outputs.cache-hit != 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Сборка
+        if: steps.artifact.outputs.cache-hit != 'true'
+        run: |
+          image=$(cat container.digest)
+          mkdir -p ~/.ccache
+          docker run --rm \
+            -v "$PWD:/work" -w /work \
+            -v "$HOME/.ccache:/root/.ccache" \
+            -e CCACHE_MAXSIZE=2G \
+            -e BUILD_CONTAINER_DIGEST="$image" \
+            "$image" bash scripts/build-kernel.sh
+
+      # Выполняется всегда, в том числе при попадании в кеш: артефакт из кеша
+      # ничем не лучше свежего, пока не проверен.
+      - name: Проверка артефакта
+        run: |
+          test -f out/vmlinuz
+          grep -q "^CONFIG_DEBUG_INFO_BTF=y$" out/config
+          cd out && sha256sum -c vmlinuz.sha256
+          cat build-info.yaml
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kernel-${{ steps.inputs.outputs.key }}
+          path: |
+            out/vmlinuz
+            out/vmlinuz.sha256
+            out/config
+            out/System.map
+            out/build-info.yaml
