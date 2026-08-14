@@ -15,7 +15,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 	libssl-dev libelf-dev \
 	dwarves \
 	cpio kmod rsync \
-	xz-utils bzip2 curl ca-certificates \
+	xz-utils bzip2 zstd curl ca-certificates \
 	gnupg \
 	ccache \
 	python3 \
