@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - config/**
+      - dts/**
       - scripts/**
       - kernel/**
       - container.digest
@@ -12,6 +13,7 @@ on:
   pull_request:
     paths:
       - config/**
+      - dts/**
       - scripts/**
       - container.digest
   workflow_dispatch:
@@ -39,8 +41,10 @@ jobs:
       # Для ядра это разница между десятками минут и одной.
       - id: inputs
         run: |
-          key=$(cat Dockerfile container.digest config/* scripts/* kernel/* \
-                2>/dev/null | sha256sum | cut -c1-16)
+          # В ключ входит ВСЁ, что влияет на артефакт. Забытый здесь каталог
+          # означает выдачу устаревшего ядра из кеша при изменённых входах.
+          key=$(cat Dockerfile container.digest config/* dts/* scripts/* \
+                kernel/* 2>/dev/null | sha256sum | cut -c1-16)
           echo "key=$key" >> "$GITHUB_OUTPUT"
 
       - id: artifact
