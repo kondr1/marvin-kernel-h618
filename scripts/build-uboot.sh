@@ -18,7 +18,7 @@ BOARD_DTS=sun50i-h618-bananapi-m4-zero
 root=$(cd "$(dirname "$0")/.." && pwd)
 downloads="$root/downloads"
 srcdir="$root/src"
-out="$root/out"
+out="$root/out/uboot"
 
 uboot_src="$srcdir/u-boot-$UBOOT_VERSION"
 tfa_src="$srcdir/arm-trusted-firmware-$TFA_VERSION"

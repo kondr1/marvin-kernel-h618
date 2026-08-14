@@ -1,0 +1,141 @@
+name: kernelpackage
+
+# Ядро и загрузчик собираются в одном прогоне, потому что деливерабл один —
+# KernelPackage. Раздельные workflow не дали бы их собрать вместе: артефакты
+# чужого прогона не скачиваются без токена, а gokrazy требует, чтобы загрузчик
+# лежал внутри пакета рядом с vmlinuz.
+#
+# Слои кеша раздельные: ядро собирается ~50 минут, загрузчик ~1 минуту, и
+# правка одного не должна пересобирать другое.
+
+on:
+  push:
+    branches: [main]
+    tags: ["kernelpackage-v*"]
+    paths:
+      - config/**
+      - dts/**
+      - uboot/**
+      - kernel/**
+      - scripts/**
+      - container.digest
+      - .github/workflows/kernelpackage.yml
+  pull_request:
+    paths:
+      - config/**
+      - dts/**
+      - uboot/**
+      - scripts/**
+  workflow_dispatch:
+
+# Коммит с обновлённым container.digest делает workflow "container" под
+# GITHUB_TOKEN, а такие пуши не запускают другие workflow. После бампа digest
+# сборку запускать вручную: gh workflow run kernelpackage.yml
+
+concurrency:
+  group: kernelpackage-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write # публикация release по тегу
+  packages: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      # Ключи считаются от всего, что влияет на конкретный артефакт. Забытый
+      # каталог означает выдачу устаревшего артефакта из кеша.
+      - id: keys
+        run: |
+          kern=$(cat Dockerfile container.digest config/* dts/* kernel/* \
+                 scripts/build-kernel.sh scripts/verify-kernel.sh \
+                 2>/dev/null | sha256sum | cut -c1-16)
+          boot=$(cat Dockerfile container.digest uboot/* dts/* \
+                 scripts/build-uboot.sh 2>/dev/null | sha256sum | cut -c1-16)
+          echo "kernel=$kern" >> "$GITHUB_OUTPUT"
+          echo "uboot=$boot" >> "$GITHUB_OUTPUT"
+
+      - id: kernel-cache
+        uses: actions/cache@v4
+        with:
+          path: out/kernel
+          key: kernel-artifact-${{ steps.keys.outputs.kernel }}
+
+      - id: uboot-cache
+        uses: actions/cache@v4
+        with:
+          path: out/uboot
+          key: uboot-artifact-${{ steps.keys.outputs.uboot }}
+
+      - uses: actions/cache@v4
+        with:
+          path: downloads
+          key: sources-${{ hashFiles('kernel/*.sha256', 'uboot/*.sha256') }}
+          restore-keys: sources-
+
+      - if: steps.kernel-cache.outputs.cache-hit != 'true'
+        uses: actions/cache@v4
+        with:
+          path: ~/.ccache
+          key: ccache-${{ steps.keys.outputs.kernel }}
+          restore-keys: ccache-
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Сборка ядра
+        if: steps.kernel-cache.outputs.cache-hit != 'true'
+        run: |
+          image=$(cat container.digest)
+          mkdir -p ~/.ccache
+          docker run --rm -v "$PWD:/work" -w /work \
+            -v "$HOME/.ccache:/root/.ccache" -e CCACHE_MAXSIZE=2G \
+            -e BUILD_CONTAINER_DIGEST="$image" \
+            "$image" bash scripts/build-kernel.sh
+
+      - name: Сборка загрузчика
+        if: steps.uboot-cache.outputs.cache-hit != 'true'
+        run: |
+          image=$(cat container.digest)
+          docker run --rm -v "$PWD:/work" -w /work \
+            -e BUILD_CONTAINER_DIGEST="$image" \
+            "$image" bash scripts/build-uboot.sh
+
+      - name: Упаковка
+        run: |
+          image=$(cat container.digest)
+          docker run --rm -v "$PWD:/work" -w /work \
+            -e BUILD_CONTAINER_DIGEST="$image" \
+            "$image" bash scripts/package-kernel.sh
+
+      # Выполняется всегда, даже когда оба слоя пришли из кеша: артефакт из
+      # кеша ничем не лучше свежего, пока не проверен.
+      - name: Проверка
+        run: |
+          scripts/verify-package.sh dist/kernelpackage
+          (cd dist && sha256sum -c ./*.sha256)
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kernelpackage-${{ steps.keys.outputs.kernel }}-${{ steps.keys.outputs.uboot }}
+          path: |
+            dist/*.tar.zst
+            dist/*.sha256
+            dist/kernelpackage/kernelpackage.yaml
+
+      - name: Публикация release
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            dist/*.tar.zst dist/*.sha256 \
+            --title "KernelPackage ${GITHUB_REF_NAME}" \
+            --notes "Ядро, DTB, загрузчик и модули одним пакетом. Состав — в kernelpackage.yaml."

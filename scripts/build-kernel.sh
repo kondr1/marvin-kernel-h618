@@ -18,7 +18,7 @@ root=$(cd "$(dirname "$0")/.." && pwd)
 downloads="$root/downloads"
 src="$root/src/linux-$VERSION"
 build="$root/build"
-out="$root/out"
+out="$root/out/kernel"
 tarball="$downloads/linux-$VERSION.tar.xz"
 base_url="https://cdn.kernel.org/pub/linux/kernel/v${VERSION%%.*}.x"
 

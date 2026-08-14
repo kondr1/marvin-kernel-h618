@@ -18,7 +18,7 @@
 set -euo pipefail
 
 root=$(cd "$(dirname "$0")/.." && pwd)
-kernel=${1:-$root/out/vmlinuz}
+kernel=${1:-$root/out/kernel/vmlinuz}
 work="$root/build/qemu"
 initramfs="$work/initramfs.cpio.gz"
 logfile="$work/serial.log"
