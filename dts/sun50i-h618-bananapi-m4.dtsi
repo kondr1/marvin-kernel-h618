@@ -23,16 +23,11 @@
 		kaslr-seed = <0xfeedbeef 0xc0def00d>;
 	};
 
-	connector {
-		compatible = "hdmi-connector";
-		type = "d";
-
-		port {
-			hdmi_con_in: endpoint {
-				remote-endpoint = <&hdmi_out_con>;
-			};
-		};
-	};
+	/*
+	 * HDMI-разъём и дисплейный движок убраны: устройство безголовое, консоль
+	 * на serial. В mainline 6.18 узлов de/hdmi для H616 всё равно нет — они
+	 * приходят из патч-сета Armbian, который мы не тянем.
+	 */
 
 	reg_usb_vbus: regulator-usb-vbus {
 		/* Separate discrete regulator for the USB ports */
@@ -81,44 +76,8 @@
 	};
 };
 
-&ahub_dam_plat {
-	status = "okay";
-};
-
-&ahub1_plat {
-	status = "okay";
-};
-
-&ahub1_mach {
-	status = "okay";
-};
-
-&codec {
-	status = "disabled";
-	allwinner,audio-routing = "Line Out", "LINEOUT";
-};
-
 &cpu0 {
 	cpu-supply = <&reg_dcdc2>;
-};
-
-&de {
-	status = "okay";
-};
-
-&gpu {
-	status = "disabled";
-	mali-supply = <&reg_dcdc1>;
-};
-
-&hdmi {
-	status = "okay";
-};
-
-&hdmi_out {
-	hdmi_out_con: endpoint {
-		remote-endpoint = <&hdmi_con_in>;
-	};
 };
 
 &i2c0 {
