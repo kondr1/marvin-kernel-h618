@@ -17,6 +17,10 @@ on:
       - dts/**
       - uboot/**
       - kernel/**
+      # firmware/ feeds the kernel cache key, so a change here must rebuild —
+      # otherwise the key moves while nothing runs and the next unrelated push
+      # silently serves a package built from different firmware.
+      - firmware/**
       - scripts/**
       - container.digest
       - .github/workflows/kernelpackage.yml
@@ -25,6 +29,7 @@ on:
       - config/**
       - dts/**
       - uboot/**
+      - firmware/**
       - scripts/**
   workflow_dispatch:
 
