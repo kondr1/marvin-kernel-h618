@@ -1,71 +1,73 @@
 #!/usr/bin/env bash
-# Проверка собранного KernelPackage перед публикацией.
+# Verifies a built KernelPackage before publishing.
 #
-# Проверяется состав и пригодность, а не факт сборки: пакет без загрузчика
-# или без модулей соберётся в образ молча, а плата после этого не загрузится
-# либо останется без драйверов.
+# What is checked is the contents and their fitness, not the fact that a build
+# happened: a package missing the bootloader or the modules gets assembled into
+# an image silently, and the board then either fails to boot or comes up with
+# no drivers.
 #
-# Использование: verify-package.sh <каталог-пакета>
+# Usage: verify-package.sh <package-directory>
 set -euo pipefail
 
-pkg=${1:?нужен каталог KernelPackage}
+pkg=${1:?KernelPackage directory required}
 errors=0
 
 fail() {
-	echo "ОШИБКА: $1" >&2
+	echo "ERROR: $1" >&2
 	errors=$((errors + 1))
 }
 
-# Обязательный состав. u-boot-sunxi-with-spl.bin читается gok из пакета и
-# пишется в сырую область диска по смещению 8 КиБ (slug nanopi_neo).
+# Mandatory contents. u-boot-sunxi-with-spl.bin is read by gok out of the
+# package and written to the disk's raw area at an 8 KiB offset (slug
+# nanopi_neo).
 for f in vmlinuz boot.scr u-boot-sunxi-with-spl.bin kernel.go kernelpackage.yaml; do
-	[ -f "$pkg/$f" ] || fail "нет $f"
+	[ -f "$pkg/$f" ] || fail "missing $f"
 done
 
-ls "$pkg"/*.dtb >/dev/null 2>&1 || fail "нет ни одного DTB"
+ls "$pkg"/*.dtb >/dev/null 2>&1 || fail "no DTB at all"
 
 modules_dir=$(find "$pkg/lib/modules" -maxdepth 1 -mindepth 1 -type d 2>/dev/null | head -1)
-[ -n "$modules_dir" ] || fail "нет lib/modules/<версия>"
+[ -n "$modules_dir" ] || fail "missing lib/modules/<version>"
 
-# Пустой каталог модулей означает, что modules_install отработал вхолостую.
+# An empty modules directory means modules_install ran but produced nothing.
 if [ -n "$modules_dir" ]; then
 	count=$(find "$modules_dir" -name '*.ko*' | wc -l)
-	[ "$count" -gt 0 ] || fail "в lib/modules нет ни одного модуля"
-	echo "модулей: $count"
+	[ "$count" -gt 0 ] || fail "lib/modules contains no modules at all"
+	echo "modules: $count"
 fi
 
-# Без firmware онбордовое радио не поднимется, а выяснится это только на
-# плате: драйвер загрузится и молча не найдёт устройство.
+# Without firmware the onboard radio never comes up, and that only becomes
+# apparent on the board: the driver loads and silently finds no device.
 for fw in brcm/brcmfmac43455-sdio.bin brcm/brcmfmac43455-sdio.clm_blob \
 	rtw88/rtw8812a_fw.bin rtlwifi/rtl8188eufw.bin; do
-	[ -f "$pkg/lib/firmware/$fw" ] || fail "нет firmware $fw"
+	[ -f "$pkg/lib/firmware/$fw" ] || fail "missing firmware $fw"
 done
 ls "$pkg"/lib/firmware/brcm/brcmfmac43455-sdio.*.txt >/dev/null 2>&1 ||
-	fail "нет board-NVRAM brcmfmac43455-sdio.<compatible>.txt"
+	fail "missing board NVRAM brcmfmac43455-sdio.<compatible>.txt"
 
-# Ядро arm64 начинается с магии 'ARM\x64' по смещению 56 — быстрая проверка,
-# что это действительно образ нужной архитектуры, а не чужой файл.
+# An arm64 kernel carries the 'ARM\x64' magic at offset 56 — a quick check that
+# this really is an image of the right architecture and not some stray file.
 if [ -f "$pkg/vmlinuz" ]; then
 	magic=$(dd if="$pkg/vmlinuz" bs=1 skip=56 count=4 2>/dev/null | tr -d '\0')
 	[ "$magic" = "ARM" ] || [ "$magic" = "ARMd" ] ||
-		echo "ВНИМАНИЕ: не найдена магия arm64 в vmlinuz (получено '$magic')"
+		echo "WARNING: no arm64 magic found in vmlinuz (got '$magic')"
 	size=$(stat -c%s "$pkg/vmlinuz")
-	[ "$size" -gt 1000000 ] || fail "vmlinuz подозрительно мал: $size байт"
+	[ "$size" -gt 1000000 ] || fail "vmlinuz is suspiciously small: $size bytes"
 fi
 
-# Загрузчик меньше сотни килобайт означает, что BL31 не встроился.
+# A bootloader under a hundred kilobytes means BL31 was not embedded.
 if [ -f "$pkg/u-boot-sunxi-with-spl.bin" ]; then
 	size=$(stat -c%s "$pkg/u-boot-sunxi-with-spl.bin")
-	[ "$size" -gt 200000 ] || fail "загрузчик подозрительно мал: $size байт"
-	# Область под загрузчик в раскладке nanopi_neo — 2032 сектора от 16-го.
+	[ "$size" -gt 200000 ] || fail "bootloader is suspiciously small: $size bytes"
+	# In the nanopi_neo layout the bootloader area is 2032 sectors from sector 16.
 	limit=$((2032 * 512))
 	[ "$size" -lt "$limit" ] ||
-		fail "загрузчик не влезает в отведённую область: $size ≥ $limit байт"
+		fail "the bootloader does not fit its reserved area: $size >= $limit bytes"
 fi
 
 if [ "$errors" -gt 0 ]; then
-	echo "Провалено: ошибок $errors" >&2
+	echo "Failed: $errors error(s)" >&2
 	exit 1
 fi
 
-echo "KernelPackage проверен"
+echo "KernelPackage verified"

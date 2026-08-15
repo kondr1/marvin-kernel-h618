@@ -1,15 +1,16 @@
 #!/usr/bin/env bash
-# Проверка собранного ядра.
+# Verifies the built kernel.
 #
-# Главная ловушка merge_config: если у опции не выполнены зависимости, она
-# молча не попадает в итоговый .config, сборка при этом проходит успешно, и
-# отсутствие BTF выясняется уже на плате, когда dae откажется стартовать.
-# Поэтому проверяется не факт сборки, а итоговый .config и секции vmlinux.
+# The main merge_config trap: when an option's dependencies are not satisfied,
+# it is silently dropped from the resulting .config, the build still succeeds,
+# and the missing BTF only shows up on the board when dae refuses to start.
+# That is why this checks the resulting .config and the vmlinux sections rather
+# than the mere fact that a build happened.
 #
-# Использование: verify-kernel.sh <каталог-сборки>
+# Usage: verify-kernel.sh <build-directory>
 set -euo pipefail
 
-build=${1:?нужен каталог сборки}
+build=${1:?build directory required}
 config="$build/.config"
 vmlinux="$build/vmlinux"
 readelf_bin=${READELF:-aarch64-linux-gnu-readelf}
@@ -17,17 +18,18 @@ readelf_bin=${READELF:-aarch64-linux-gnu-readelf}
 errors=0
 
 fail() {
-	echo "ОШИБКА: $1" >&2
+	echo "ERROR: $1" >&2
 	errors=$((errors + 1))
 }
 
 [ -f "$config" ] || {
-	echo "ОШИБКА: нет $config" >&2
+	echo "ERROR: missing $config" >&2
 	exit 1
 }
 
-# Опции, без которых продукт не работает. Список намеренно короткий: сюда
-# попадает только то, отсутствие чего ломает функцию, а не оптимизации.
+# Options without which the product does not work. The list is deliberately
+# short: only things whose absence breaks a function belong here, not
+# optimizations.
 required="
 CONFIG_BPF_SYSCALL
 CONFIG_BPF_JIT
@@ -49,29 +51,30 @@ CONFIG_SQUASHFS
 
 for opt in $required; do
 	grep -qE "^$opt=(y|m)$" "$config" ||
-		fail "опция $opt не включена в итоговом .config"
+		fail "option $opt is not enabled in the resulting .config"
 done
 
-# DEBUG_INFO_REDUCED вычищает типы, из которых pahole строит BTF.
+# DEBUG_INFO_REDUCED strips out the very types pahole builds BTF from.
 if grep -qE "^CONFIG_DEBUG_INFO_REDUCED=y$" "$config"; then
-	fail "CONFIG_DEBUG_INFO_REDUCED=y — BTF будет неполным"
+	fail "CONFIG_DEBUG_INFO_REDUCED=y — BTF would be incomplete"
 fi
 
-# Наличие опции в конфиге ещё не значит, что BTF реально сгенерирован:
-# без pahole в контейнере сборка проходит, а секции нет.
+# An option being present in the config does not mean BTF was actually
+# generated: without pahole in the container the build succeeds but the section
+# is missing.
 if [ -f "$vmlinux" ]; then
 	if "$readelf_bin" -S "$vmlinux" 2>/dev/null | grep -q '\.BTF'; then
-		echo "ok: секция .BTF присутствует в vmlinux"
+		echo "ok: the .BTF section is present in vmlinux"
 	else
-		fail "в vmlinux нет секции .BTF — dae не загрузит eBPF"
+		fail "vmlinux has no .BTF section — dae will not load eBPF"
 	fi
 else
-	fail "нет $vmlinux, проверить BTF нечем"
+	fail "missing $vmlinux, nothing to check BTF against"
 fi
 
 if [ "$errors" -gt 0 ]; then
-	echo "Провалено: ошибок $errors" >&2
+	echo "Failed: $errors error(s)" >&2
 	exit 1
 fi
 
-echo "Проверка ядра пройдена"
+echo "Kernel verification passed"

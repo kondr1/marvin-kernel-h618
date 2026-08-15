@@ -1,11 +1,12 @@
-# U-Boot для BananaPi BPI-M4 Zero (Allwinner H618).
+# U-Boot for the BananaPi BPI-M4 Zero (Allwinner H618).
 #
-# Платы нет в upstream U-Boot. Значения взяты из патча Armbian
-# (Patrick Yavitz, GPL-2.0), параметры DRAM совпадают с orangepi_zero2w —
-# те же ODT/DRI/TPR и та же частота, что ожидаемо: обе платы на H618 с LPDDR4.
+# The board is absent from upstream U-Boot. The values come from an Armbian
+# patch (Patrick Yavitz, GPL-2.0); the DRAM parameters match orangepi_zero2w —
+# the same ODT/DRI/TPR and the same clock, which is expected: both boards are
+# H618 with LPDDR4.
 #
-# Трогать параметры DRAM вслепую нельзя: ошибка здесь проявляется не как
-# «не собралось», а как случайные зависания под нагрузкой.
+# Do not touch the DRAM parameters blindly: a mistake here does not show up as
+# "it failed to build" but as random lockups under load.
 CONFIG_OF_UPSTREAM=y
 CONFIG_ARM=y
 CONFIG_ARCH_SUNXI=y

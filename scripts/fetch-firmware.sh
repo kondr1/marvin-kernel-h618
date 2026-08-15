@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
-# Скачивание firmware онбордового радио в раскладку KernelPackage.
+# Downloads the onboard radio firmware into the KernelPackage layout.
 #
-# Firmware не собирается — оно бинарное и берётся как есть, поэтому здесь
-# только загрузка с пином и проверкой контрольных сумм.
+# Firmware is not built — it is binary and taken as is, so all that happens
+# here is a pinned download with checksum verification.
 #
-# Отдельно про CLM blob: без него brcmfmac остаётся на встроенном regulatory
-# (`country 99`) и не пускает радио в 5 ГГц — ровно это и измерено на плате
-# под Armbian. Кладём его под именем, которое драйвер действительно
-# запрашивает, и проверяем результат на железе: это гипотеза, а не гарантия.
+# A note on the CLM blob: without it brcmfmac stays on its built-in regulatory
+# data (`country 99`) and refuses to take the radio into 5 GHz — exactly what
+# was measured on the board under Armbian. We install it under the name the
+# driver actually requests and confirm the outcome on hardware: this is a
+# hypothesis, not a guarantee.
 set -euo pipefail
 
 ARMBIAN_COMMIT=${ARMBIAN_COMMIT:-f49ca1169c8eaea80658de3752ab6e2b4bc1ac40}
@@ -40,10 +41,10 @@ while read -r target source; do
 
 	sha=$(sha256sum "$out/$target" | cut -d' ' -f1)
 	printf '%s  %s\n' "$sha" "$target" >> "$tmp/computed.sha256"
-	printf '  %s (%s байт)\n' "$target" "$(stat -c%s "$out/$target")"
+	printf '  %s (%s bytes)\n' "$target" "$(stat -c%s "$out/$target")"
 done < "$manifest"
 
-printf '\n== Firmware адаптеров (armbian/firmware @ %s)\n' "${FIRMWARE_COMMIT:0:12}"
+printf '\n== Adapter firmware (armbian/firmware @ %s)\n' "${FIRMWARE_COMMIT:0:12}"
 while read -r origin source target; do
 	case "$origin" in
 	'#'* | '') continue ;;
@@ -54,22 +55,22 @@ while read -r origin source target; do
 
 	sha=$(sha256sum "$fwroot/$target" | cut -d' ' -f1)
 	printf '%s  %s\n' "$sha" "$target" >> "$tmp/computed.sha256"
-	printf '  %s (%s байт)\n' "$target" "$(stat -c%s "$fwroot/$target")"
+	printf '  %s (%s bytes)\n' "$target" "$(stat -c%s "$fwroot/$target")"
 done < "$wifi_manifest"
 
-# Тот же принцип, что и с исходниками: пин работает, только если суммы лежат
-# в репозитории. Первая загрузка их печатает, дальше они сверяются.
+# Same principle as with the sources: pinning only works if the checksums live
+# in the repository. The first download prints them, later runs compare.
 if [ -f "$sums" ]; then
 	if diff -q <(sort "$sums") <(sort "$tmp/computed.sha256") >/dev/null; then
-		echo "  контрольные суммы: ok"
+		echo "  checksums: ok"
 	else
-		echo "ОШИБКА: firmware не совпало с зафиксированными суммами" >&2
+		echo "ERROR: firmware does not match the pinned checksums" >&2
 		diff <(sort "$sums") <(sort "$tmp/computed.sha256") >&2 || true
 		exit 1
 	fi
 else
 	cp "$tmp/computed.sha256" "$sums"
-	echo "  суммы зафиксированы впервые — внеси $sums в репозиторий:"
+	echo "  checksums pinned for the first time — commit $sums to the repository:"
 	cat "$sums"
 fi
 

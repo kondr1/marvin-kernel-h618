@@ -2,11 +2,11 @@
 /*
  * Copyright (c) 2025 Patrick Yavitz <pyavitz@armbian.com>
  *
- * Изменено для Marvin: убраны узлы, которых нет в mainline 6.18 (аудиохаб,
- * дисплей с HDMI, второй Ethernet) и отключённая периферия, ссылавшаяся на
- * pinctrl-определения из патч-сета Armbian (i2c1/3/4, uart1/4/5, spi0/1, ir).
- * Оригинал собирается только поверх патчей Armbian; здесь нужен файл,
- * собирающийся на mainline.
+ * Modified for Marvin: removed the nodes that do not exist in mainline 6.18
+ * (audio hub, display with HDMI, second Ethernet) along with the disabled
+ * peripherals that referenced pinctrl definitions from the Armbian patch set
+ * (i2c1/3/4, uart1/4/5, spi0/1, ir). The original only compiles on top of the
+ * Armbian patches; what is needed here is a file that compiles on mainline.
  */
 
 /dts-v1/;
@@ -29,7 +29,7 @@
 	};
 
 	reg_usb_vbus: regulator-usb-vbus {
-		/* Отдельный регулятор на USB-порты */
+		/* Dedicated regulator for the USB ports */
 		compatible = "regulator-fixed";
 		regulator-min-microvolt = <5000000>;
 		regulator-max-microvolt = <5000000>;
@@ -38,7 +38,7 @@
 	};
 
 	reg_vcc5v: regulator-vcc5v {
-		/* 5 В с разъёма USB-C на всю плату */
+		/* 5 V from the USB-C connector, feeding the whole board */
 		compatible = "regulator-fixed";
 		regulator-always-on;
 		regulator-min-microvolt = <5000000>;
@@ -79,7 +79,7 @@
 	cpu-supply = <&reg_dcdc2>;
 };
 
-/* SD-карта: с неё идёт первичная загрузка при bring-up. */
+/* SD card: the primary boot medium during bring-up. */
 &mmc0 {
 	status = "okay";
 	bus-width = <4>;
@@ -122,8 +122,8 @@
 	};
 };
 
-/* PMIC: задаёт напряжения CPU, DRAM и линий ввода-вывода. Без него плата
- * не поднимется — это не опциональная периферия. */
+/* PMIC: sets the CPU, DRAM and I/O rail voltages. The board will not come up
+ * without it — this is not an optional peripheral. */
 &r_i2c {
 	status = "okay";
 	axp313: pmic@36 {
@@ -176,7 +176,7 @@
 	};
 };
 
-/* Консоль bring-up. Скорость зафиксирована в chosen/stdout-path. */
+/* Bring-up console. The baud rate is pinned in chosen/stdout-path. */
 &uart0 {
 	status = "okay";
 	pinctrl-0 = <&uart0_ph_pins>;

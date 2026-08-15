@@ -1,12 +1,12 @@
 name: kernelpackage
 
-# Ядро и загрузчик собираются в одном прогоне, потому что деливерабл один —
-# KernelPackage. Раздельные workflow не дали бы их собрать вместе: артефакты
-# чужого прогона не скачиваются без токена, а gokrazy требует, чтобы загрузчик
-# лежал внутри пакета рядом с vmlinuz.
+# The kernel and the bootloader are built in a single run because there is one
+# deliverable: the KernelPackage. Separate workflows could not assemble it —
+# artifacts from another run are not downloadable without a token, and gokrazy
+# requires the bootloader to live inside the package next to vmlinuz.
 #
-# Слои кеша раздельные: ядро собирается ~50 минут, загрузчик ~1 минуту, и
-# правка одного не должна пересобирать другое.
+# The cache layers are kept separate: the kernel takes ~50 minutes to build and
+# the bootloader ~1 minute, so touching one must not rebuild the other.
 
 on:
   push:
@@ -28,16 +28,16 @@ on:
       - scripts/**
   workflow_dispatch:
 
-# Коммит с обновлённым container.digest делает workflow "container" под
-# GITHUB_TOKEN, а такие пуши не запускают другие workflow. После бампа digest
-# сборку запускать вручную: gh workflow run kernelpackage.yml
+# The commit that updates container.digest is made by the "container" workflow
+# under GITHUB_TOKEN, and such pushes do not trigger other workflows. After a
+# digest bump, start the build manually: gh workflow run kernelpackage.yml
 
 concurrency:
   group: kernelpackage-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
-  contents: write # публикация release по тегу
+  contents: write # publishing a release on tag
   packages: read
 
 jobs:
@@ -47,8 +47,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Ключи считаются от всего, что влияет на конкретный артефакт. Забытый
-      # каталог означает выдачу устаревшего артефакта из кеша.
+      # Keys are computed over everything that affects the given artifact. A
+      # forgotten directory means a stale artifact gets served from the cache.
       - id: keys
         run: |
           kern=$(cat Dockerfile container.digest config/* dts/* kernel/* \
@@ -90,7 +90,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Сборка ядра
+      - name: Build kernel
         if: steps.kernel-cache.outputs.cache-hit != 'true'
         run: |
           image=$(cat container.digest)
@@ -100,15 +100,15 @@ jobs:
             -e BUILD_CONTAINER_DIGEST="$image" \
             "$image" bash scripts/build-kernel.sh
 
-      # Скачивается всегда: файлы маленькие, а отсутствие firmware
-      # обнаружилось бы только на плате молчащим радио.
+      # Always downloaded: the files are small, and missing firmware would only
+      # surface on the board as a silent radio.
       - name: Firmware
         run: |
           image=$(cat container.digest)
           docker run --rm -v "$PWD:/work" -w /work \
             "$image" bash scripts/fetch-firmware.sh
 
-      - name: Сборка загрузчика
+      - name: Build bootloader
         if: steps.uboot-cache.outputs.cache-hit != 'true'
         run: |
           image=$(cat container.digest)
@@ -116,16 +116,16 @@ jobs:
             -e BUILD_CONTAINER_DIGEST="$image" \
             "$image" bash scripts/build-uboot.sh
 
-      - name: Упаковка
+      - name: Package
         run: |
           image=$(cat container.digest)
           docker run --rm -v "$PWD:/work" -w /work \
             -e BUILD_CONTAINER_DIGEST="$image" \
             "$image" bash scripts/package-kernel.sh
 
-      # Выполняется всегда, даже когда оба слоя пришли из кеша: артефакт из
-      # кеша ничем не лучше свежего, пока не проверен.
-      - name: Проверка
+      # Always runs, even when both layers came from the cache: a cached
+      # artifact is no better than a fresh one until it has been verified.
+      - name: Verify
         run: |
           scripts/verify-package.sh dist/kernelpackage
           (cd dist && sha256sum -c ./*.sha256)
@@ -138,7 +138,7 @@ jobs:
             dist/*.sha256
             dist/kernelpackage/kernelpackage.yaml
 
-      - name: Публикация release
+      - name: Publish release
         if: startsWith(github.ref, 'refs/tags/')
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -146,4 +146,4 @@ jobs:
           gh release create "${GITHUB_REF_NAME}" \
             dist/*.tar.zst dist/*.sha256 \
             --title "KernelPackage ${GITHUB_REF_NAME}" \
-            --notes "Ядро, DTB, загрузчик и модули одним пакетом. Состав — в kernelpackage.yaml."
+            --notes "Kernel, DTB, bootloader and modules in one package. Contents: kernelpackage.yaml."

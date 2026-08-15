@@ -2,9 +2,9 @@
 /*
  * Copyright (c) 2025 Patrick Yavitz <pyavitz@armbian.com>
  *
- * Изменено для Marvin: убраны aliases на удалённую периферию, тактирование
- * AC300 через pwm (нет в mainline) и калибровка внутреннего Ethernet-PHY —
- * проводного порта в нашей конфигурации нет.
+ * Modified for Marvin: dropped the aliases for removed peripherals, the AC300
+ * clocking via pwm (not in mainline) and the internal Ethernet PHY
+ * calibration — our configuration has no wired port.
  */
 
 /dts-v1/;
@@ -28,10 +28,10 @@
 };
 
 /*
- * USB-хосты. По комментарию автора оригинального DTS к ehci1 подключён
- * онбордовый Wi-Fi RTL8821CU — то есть встроенное радио висит на USB, а не
- * на SDIO. Это противоречит и нашим докам (AIC8800 по SDIO), и узлу mmc1
- * ниже. Разрешается логом первой загрузки, см. docs/bring-up.md §2.
+ * USB hosts. A comment by the original DTS author says ehci1 carries the
+ * onboard RTL8821CU Wi-Fi — i.e. the built-in radio sits on USB, not on SDIO.
+ * That contradicts both our documentation (AIC8800 over SDIO) and the mmc1
+ * node below. To be settled by the first boot log, see docs/bring-up.md §2.
  */
 &ehci1 {
 	status = "okay";
@@ -58,12 +58,12 @@
 };
 
 /*
- * SDIO: онбордовое радио BCM43455 (измерено на плате, ревизия v2 —
- * docs/hardware-inventory.md в marvin-research). Узел включён.
+ * SDIO: the onboard BCM43455 radio (measured on the board, revision v2 —
+ * docs/hardware-inventory.md in marvin-research). Node enabled.
  *
- * compatible остаётся "brcm,bcm4329-fmac": это общая привязка brcmfmac для
- * всех SDIO-чипов Broadcom, конкретную модель драйвер определяет сам и по
- * ней запрашивает firmware.
+ * compatible stays "brcm,bcm4329-fmac": that is the generic brcmfmac binding
+ * for all Broadcom SDIO chips — the driver detects the actual model itself and
+ * requests firmware accordingly.
  */
 &mmc1 {
 	status = "okay";
@@ -73,7 +73,7 @@
 	non-removable;
 	disable-wp;
 
-	/* Firmware радио требует питания в suspend */
+	/* The radio firmware requires power to be kept across suspend */
 	keep-power-in-suspend;
 
 	mmc-pwrseq = <&wifi_pwrseq>;

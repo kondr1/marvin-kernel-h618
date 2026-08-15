@@ -1,18 +1,18 @@
-# Firmware Wi-Fi-адаптеров. Формат: <источник> <имя-в-lib/firmware>
+# Wi-Fi adapter firmware. Format: <source> <name-in-lib/firmware>
 #
-# Каждая строка — прямое требование драйвера, а не «на всякий случай»:
-# имена взяты из MODULE_FIRMWARE в исходниках ядра 6.18.
+# Every line is a driver's explicit requirement, not a just-in-case addition:
+# the names come from MODULE_FIRMWARE in the 6.18 kernel sources.
 #
-#   rtw88/rtw8812a_fw.bin      — RTL8812AU (0bda:8812) на in-kernel rtw88.
-#                                Без него адаптер привяжется и не заработает.
-#   rtlwifi/rtl8188eufw.bin    — RTL8188EU (0bda:0179), драйвер rtl8xxxu.
-#   brcm/brcmfmac43455-sdio.*  — онбордовое радио, см. brcm.manifest.
+#   rtw88/rtw8812a_fw.bin      — RTL8812AU (0bda:8812) on in-kernel rtw88.
+#                                Without it the adapter binds but never works.
+#   rtlwifi/rtl8188eufw.bin    — RTL8188EU (0bda:0179), rtl8xxxu driver.
+#   brcm/brcmfmac43455-sdio.*  — onboard radio, see brcm.manifest.
 #
-# Источник: зеркало firmware Armbian на пиннутом коммите. kernel.org закрыт
-# анти-бот защитой и для автоматической загрузки непригоден.
+# Source: the Armbian firmware mirror at a pinned commit. kernel.org sits
+# behind anti-bot protection and is unusable for automated downloads.
 #
-# Лицензии: бинарное firmware Realtek и Broadcom/Cypress. Условия
-# распространения зафиксировать в docs/licensing.md — TODO(build).
+# Licenses: binary firmware from Realtek and Broadcom/Cypress. Distribution
+# terms to be recorded in docs/licensing.md — TODO(build).
 
 armbian-firmware rtw88/rtw8812a_fw.bin rtw88/rtw8812a_fw.bin
 armbian-firmware rtlwifi/rtl8188eufw.bin rtlwifi/rtl8188eufw.bin

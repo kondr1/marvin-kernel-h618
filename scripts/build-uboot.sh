@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Сборка загрузчика: TF-A (BL31) + U-Boot с SPL для H618.
+# Builds the bootloader: TF-A (BL31) + U-Boot with SPL for the H618.
 #
-# Порядок обязателен: U-Boot встраивает готовый bl31.bin в итоговый образ,
-# поэтому TF-A собирается первым. Без BL31 плата не выйдет из EL3.
+# The order is mandatory: U-Boot embeds a prebuilt bl31.bin into the final
+# image, so TF-A is built first. Without BL31 the board never leaves EL3.
 #
-# Запускается одинаково локально и в CI, внутри контейнера сборки:
-#   docker run --rm -v "$PWD:/work" -w /work <образ-по-digest> \
+# Runs identically locally and in CI, inside the build container:
+#   docker run --rm -v "$PWD:/work" -w /work <image-by-digest> \
 #     bash scripts/build-uboot.sh
 set -euo pipefail
 
@@ -27,8 +27,8 @@ mkdir -p "$downloads" "$srcdir" "$out"
 
 step() { printf '\n== %s\n' "$1"; }
 
-# Скачивание с фиксацией контрольной суммы: при первой загрузке значение
-# печатается и вносится в репозиторий отдельным коммитом.
+# Download with checksum pinning: on the first fetch the value is printed and
+# committed to the repository as a separate change.
 fetch_pinned() {
 	local url=$1 dest=$2 name=$3
 	[ -f "$dest" ] || curl -fsSL -o "$dest" "$url"
@@ -38,15 +38,15 @@ fetch_pinned() {
 	if [ -f "$expected_file" ]; then
 		expected=$(cut -d' ' -f1 < "$expected_file")
 		[ "$actual" = "$expected" ] || {
-			echo "ОШИБКА: SHA256 $name не совпал" >&2
-			echo "  получено:  $actual" >&2
-			echo "  ожидалось: $expected" >&2
+			echo "ERROR: SHA256 mismatch for $name" >&2
+			echo "  got:      $actual" >&2
+			echo "  expected: $expected" >&2
 			exit 1
 		}
 		echo "  $name: SHA256 ok"
 	else
 		echo "$actual  $(basename "$dest")" > "$expected_file"
-		echo "  $name: SHA256 зафиксирован впервые — $actual"
+		echo "  $name: SHA256 pinned for the first time — $actual"
 	fi
 }
 
@@ -64,7 +64,7 @@ make -C "$tfa_src" CROSS_COMPILE="$CROSS_COMPILE" \
 
 bl31="$tfa_src/build/sun50i_h616/release/bl31.bin"
 [ -f "$bl31" ] || {
-	echo "ОШИБКА: BL31 не собран" >&2
+	echo "ERROR: BL31 was not built" >&2
 	exit 1
 }
 
@@ -77,9 +77,9 @@ fetch_pinned \
 
 [ -d "$uboot_src" ] || tar -xf "$uboot_tar" -C "$srcdir"
 
-# Платы нет в upstream: кладём свой defconfig и тот же DTS, что и у ядра.
-# U-Boot ≥ 2024 берёт деревья из dts/upstream — синхронизированной копии
-# дерева ядра, поэтому файл подходит без изменений.
+# The board is absent from upstream: we drop in our own defconfig and the same
+# DTS the kernel uses. U-Boot >= 2024 takes device trees from dts/upstream, a
+# synchronized copy of the kernel tree, so the file fits unmodified.
 cp "$root/uboot/$DEFCONFIG" "$uboot_src/configs/$DEFCONFIG"
 cp "$root"/dts/*.dts "$root"/dts/*.dtsi \
 	"$uboot_src/dts/upstream/src/arm64/allwinner/"
@@ -90,19 +90,19 @@ make -C "$uboot_src" CROSS_COMPILE="$CROSS_COMPILE" \
 
 image="$uboot_src/u-boot-sunxi-with-spl.bin"
 [ -f "$image" ] || {
-	echo "ОШИБКА: образ загрузчика не собран" >&2
+	echo "ERROR: the bootloader image was not built" >&2
 	exit 1
 }
 
 # --- 3. boot.scr -------------------------------------------------------------
-# mkimage берётся из только что собранного U-Boot: версия инструмента и
-# версия загрузчика тогда заведомо совпадают.
+# mkimage is taken from the U-Boot that was just built, so the tool version and
+# the bootloader version are guaranteed to match.
 step "boot.scr"
 "$uboot_src/tools/mkimage" -C none -A arm64 -T script \
 	-d "$root/uboot/boot.cmd" "$out/boot.scr"
 
-# --- 4. Артефакты ------------------------------------------------------------
-step "Артефакты"
+# --- 4. Artifacts ------------------------------------------------------------
+step "Artifacts"
 cp "$image" "$out/u-boot-sunxi-with-spl.bin"
 sha=$(sha256sum "$out/u-boot-sunxi-with-spl.bin" | cut -d' ' -f1)
 echo "$sha  u-boot-sunxi-with-spl.bin" > "$out/u-boot-sunxi-with-spl.bin.sha256"
@@ -117,8 +117,9 @@ board_dts: $BOARD_DTS
 artifact_sha256: $sha
 build_container_digest: ${BUILD_CONTAINER_DIGEST:-unknown}
 notes: >
-  Платы нет в upstream U-Boot: defconfig и DTS наши. Загрузка на железе не
-  проверялась. Образ пишется на microSD со смещением 8 КиБ:
+  The board is absent from upstream U-Boot: the defconfig and DTS are ours.
+  Booting on hardware is untested. The image is written to microSD at an offset
+  of 8 KiB:
   dd if=u-boot-sunxi-with-spl.bin of=/dev/sdX bs=1024 seek=8 conv=fsync
 EOF
 

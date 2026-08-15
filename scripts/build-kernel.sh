@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# Кросс-сборка ядра под arm64 для Marvin.
+# Cross-builds the arm64 kernel for Marvin.
 #
-# Запускается одинаково локально и в CI, всегда внутри контейнера сборки:
-#   docker run --rm -v "$PWD:/work" -w /work <образ-по-digest> \
+# Runs identically locally and in CI, always inside the build container:
+#   docker run --rm -v "$PWD:/work" -w /work <image-by-digest> \
 #     bash scripts/build-kernel.sh
 #
-# Плата на этом шаге не участвует: собирается ядро с нашими фрагментами и
-# проверяется, что BTF реально сгенерирован. DTS платы и U-Boot добавляются
-# отдельным шагом — в mainline поддержки BPI-M4 Zero нет.
+# The board plays no part in this step: it builds the kernel with our config
+# fragments and verifies that BTF was actually generated. The board DTS and
+# U-Boot are added by a separate step — mainline has no BPI-M4 Zero support.
 set -euo pipefail
 
 VERSION=${KERNEL_VERSION:-6.18.44}
@@ -26,8 +26,8 @@ mkdir -p "$downloads" "$out" "$root/src" "$build"
 
 step() { printf '\n== %s\n' "$1"; }
 
-# --- 1. Исходники ------------------------------------------------------------
-step "Исходники ядра $VERSION"
+# --- 1. Sources --------------------------------------------------------------
+step "Kernel sources $VERSION"
 if [ ! -f "$tarball" ]; then
 	curl -fsSL -o "$tarball" "$base_url/linux-$VERSION.tar.xz"
 	curl -fsSL -o "$tarball.sign" "$base_url/linux-$VERSION.tar.sign" || true
@@ -39,43 +39,45 @@ mkdir -p "$root/kernel"
 if [ -f "$expected_file" ]; then
 	expected=$(cut -d' ' -f1 < "$expected_file")
 	[ "$sha256" = "$expected" ] || {
-		echo "ОШИБКА: SHA256 тарболла не совпал" >&2
-		echo "  получено:  $sha256" >&2
-		echo "  ожидалось: $expected" >&2
+		echo "ERROR: tarball SHA256 mismatch" >&2
+		echo "  got:      $sha256" >&2
+		echo "  expected: $expected" >&2
 		exit 1
 	}
 	echo "SHA256: ok"
 else
 	echo "$sha256  linux-$VERSION.tar.xz" > "$expected_file"
-	echo "SHA256 зафиксирован впервые: $sha256"
+	echo "SHA256 pinned for the first time: $sha256"
 fi
-# TODO(build): проверка PGP-подписи kernel.org после фиксации отпечатка ключа.
+# TODO(build): verify the kernel.org PGP signature once the key fingerprint is
+# pinned.
 
-# --- 2. Распаковка -----------------------------------------------------------
-step "Распаковка"
+# --- 2. Unpack ---------------------------------------------------------------
+step "Unpack"
 if [ ! -d "$src" ]; then
 	tar -xf "$tarball" -C "$root/src"
 fi
 
-# --- 2a. DTS платы -----------------------------------------------------------
-# Платы нет в mainline, поэтому DTS кладём в дерево сами. Файлы взяты из
-# Armbian (GPL-2.0+ OR MIT, авторство сохранено в заголовках) — писать их с
-# нуля незачем, там уже разобрана распиновка.
-step "DTS платы"
+# --- 2a. Board DTS -----------------------------------------------------------
+# The board is absent from mainline, so we drop the DTS into the tree
+# ourselves. The files come from Armbian (GPL-2.0+ OR MIT, authorship kept in
+# the headers) — there is no point rewriting them from scratch, the pinout is
+# already worked out there.
+step "Board DTS"
 dts_dir="$src/arch/arm64/boot/dts/allwinner"
 board_dtb="sun50i-h618-bananapi-m4-zero"
 
 cp "$root"/dts/*.dts "$root"/dts/*.dtsi "$dts_dir/"
 
-# Без записи в Makefile kbuild про наш DTS не знает.
+# Without an entry in the Makefile, kbuild does not know about our DTS.
 if ! grep -q "$board_dtb.dtb" "$dts_dir/Makefile"; then
 	echo "dtb-\$(CONFIG_ARCH_SUNXI) += $board_dtb.dtb" >> "$dts_dir/Makefile"
 fi
 
-# --- 3. Конфигурация ---------------------------------------------------------
-# Сборка идёт out-of-tree (O=), чтобы дерево исходников оставалось чистым и
-# кешировалось отдельно от результатов.
-step "Конфигурация"
+# --- 3. Configuration --------------------------------------------------------
+# The build is out-of-tree (O=) so the source tree stays clean and is cached
+# separately from the build results.
+step "Configuration"
 make -C "$src" O="$build" ARCH="$ARCH" CROSS_COMPILE="$CROSS_COMPILE" defconfig
 
 "$src/scripts/kconfig/merge_config.sh" -m -O "$build" "$build/.config" \
@@ -83,25 +85,26 @@ make -C "$src" O="$build" ARCH="$ARCH" CROSS_COMPILE="$CROSS_COMPILE" defconfig
 
 make -C "$src" O="$build" ARCH="$ARCH" CROSS_COMPILE="$CROSS_COMPILE" olddefconfig
 
-# --- 4. Сборка ---------------------------------------------------------------
-step "Сборка ядра"
+# --- 4. Build ----------------------------------------------------------------
+step "Build kernel"
 make -C "$src" O="$build" ARCH="$ARCH" CROSS_COMPILE="$CROSS_COMPILE" \
 	-j"$(nproc)" Image modules
 
-# Собирается только наш DTB: полный `dtbs` компилирует сотни чужих плат.
-# Путь указывается относительно arch/$ARCH/boot/dts — kbuild добавляет
-# префикс сам, полный путь он склеит сам с собой и не найдёт цель.
-step "Сборка DTB платы"
+# Only our DTB is built: a full `dtbs` compiles hundreds of other boards.
+# The path is given relative to arch/$ARCH/boot/dts — kbuild prepends that
+# prefix itself, so a full path would be concatenated onto itself and the
+# target would not be found.
+step "Build board DTB"
 make -C "$src" O="$build" ARCH="$ARCH" CROSS_COMPILE="$CROSS_COMPILE" \
 	"allwinner/$board_dtb.dtb"
 
-# --- 5. Проверки -------------------------------------------------------------
-step "Проверки"
+# --- 5. Verification ---------------------------------------------------------
+step "Verification"
 READELF="${CROSS_COMPILE}readelf" "$root/scripts/verify-kernel.sh" "$build"
 
-# --- 6. Артефакты ------------------------------------------------------------
-# Раскладка под gokrazy KernelPackage: vmlinuz + lib/modules.
-step "Артефакты"
+# --- 6. Artifacts ------------------------------------------------------------
+# Layout for a gokrazy KernelPackage: vmlinuz + lib/modules.
+step "Artifacts"
 rm -rf "$out"
 mkdir -p "$out/lib/modules"
 
@@ -128,8 +131,8 @@ board_dtb: $board_dtb.dtb
 board_dtb_source: armbian (GPL-2.0+ OR MIT)
 board_support: dtb-only
 notes: >
-  DTS взят из Armbian и в mainline отсутствует. Конфиг U-Boot для платы ещё
-  не добавлен, поэтому загрузка на железе не проверялась.
+  The DTS comes from Armbian and is absent from mainline. The U-Boot config for
+  the board has not been added yet, so booting on hardware is untested.
 EOF
 
 echo "$vmlinuz_sha  vmlinuz" > "$out/vmlinuz.sha256"

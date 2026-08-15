@@ -1,10 +1,11 @@
-# Контейнер сборки ядра для Marvin.
+# Kernel build container for Marvin.
 #
-# Кросс-компиляция под arm64 на x86: без эмуляции и без native arm64-раннеров.
-# pahole (пакет dwarves) обязателен — без него ядро соберётся, но секции .BTF
-# в vmlinux не будет, и dae не загрузит eBPF уже на плате.
+# Cross-compiles for arm64 on x86: no emulation, no native arm64 runners.
+# pahole (the dwarves package) is mandatory — without it the kernel still
+# builds, but vmlinux ends up with no .BTF section and dae fails to load its
+# eBPF programs once on the board.
 #
-# Образ потребляется ПО DIGEST (container.digest), а не по тегу.
+# The image is consumed BY DIGEST (container.digest), not by tag.
 FROM debian:bookworm-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -19,7 +20,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 	gnupg \
 	ccache \
 	python3 \
-	`# сборка U-Boot и TF-A: свои требования сверх ядерных` \
+	`# U-Boot and TF-A builds: requirements of their own on top of the kernel's` \
 	python3-dev python3-setuptools swig \
 	uuid-dev libgnutls28-dev device-tree-compiler \
 	&& rm -rf /var/lib/apt/lists/*

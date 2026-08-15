@@ -11,7 +11,7 @@ lib/modules/
 .config
 .config.old
 
-# Каталог не исключаем целиком, иначе отрицание ниже не сработает:
-# git не возвращает файлы из исключённого каталога.
+# Do not exclude the directory itself, otherwise the negation below has no
+# effect: git never descends into an excluded directory to re-include files.
 /kernel/*
 !/kernel/*.sha256

@@ -1,21 +1,22 @@
-# Скрипт загрузки для bring-up: U-Boot ищет boot.scr на первом разделе.
+# Boot script for bring-up: U-Boot looks for boot.scr on the first partition.
 #
-# Назначение — этапы A–D bring-up: довести плату до работающего ядра и
-# консоли. Финальную раскладку разделов и параметры root задаёт сборка образа
-# gokrazy, она же положит свой boot.scr.
+# Its purpose is bring-up stages A-D: get the board to a working kernel and
+# console. The final partition layout and root parameters are decided by the
+# gokrazy image build, which installs its own boot.scr.
 #
-# console=ttyS0: на H618 UART0 обслуживается драйвером 8250_dw, а не pl011.
-# Скорость должна совпадать с chosen/stdout-path в DTS.
+# console=ttyS0: on the H618, UART0 is driven by 8250_dw, not by pl011. The
+# baud rate must match chosen/stdout-path in the DTS.
 
 setenv fdtfile allwinner/sun50i-h618-bananapi-m4-zero.dtb
 setenv bootargs console=ttyS0,115200 earlycon rootwait panic=10
 
-echo "Marvin: загрузка ${fdtfile}"
+echo "Marvin: booting ${fdtfile}"
 
-load mmc 0:1 ${kernel_addr_r} Image || echo "Marvin: не найден Image"
-load mmc 0:1 ${fdt_addr_r} ${fdtfile} || echo "Marvin: не найден DTB"
+load mmc 0:1 ${kernel_addr_r} Image || echo "Marvin: Image not found"
+load mmc 0:1 ${fdt_addr_r} ${fdtfile} || echo "Marvin: DTB not found"
 
-# initramfs опционален: если положен рядом, ядру передаётся третьим аргументом.
+# The initramfs is optional: if present alongside, it is passed to the kernel
+# as the third argument.
 if load mmc 0:1 ${ramdisk_addr_r} initramfs.cpio.gz; then
 	booti ${kernel_addr_r} ${ramdisk_addr_r}:${filesize} ${fdt_addr_r}
 else

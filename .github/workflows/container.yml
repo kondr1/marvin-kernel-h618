@@ -1,7 +1,8 @@
 name: container
 
-# Образ сборки публикуется отдельно от артефактов и потребляется по digest.
-# Без этого шага "pinned digest" за пару месяцев превращается в latest.
+# The build image is published separately from the artifacts and consumed by
+# digest. Without this step a "pinned digest" degrades into latest within a
+# couple of months.
 on:
   push:
     branches: [main]
@@ -37,8 +38,8 @@ jobs:
           push: true
           tags: ghcr.io/${{ github.repository }}/build:latest
 
-      # Digest фиксируется в репозитории: сборки берут образ именно по нему.
-      - name: Записать digest
+      # The digest is pinned in the repository: builds pull the image by it.
+      - name: Record digest
         run: |
           echo "ghcr.io/${{ github.repository }}/build@${{ steps.push.outputs.digest }}" \
             > container.digest

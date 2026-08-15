@@ -1,18 +1,20 @@
-# Firmware онбордового радио BCM43455 (brcmfmac, SDIO).
+# Firmware for the onboard BCM43455 radio (brcmfmac, SDIO).
 #
-# Формат строки: <имя-в-lib/firmware/brcm> <путь-в-источнике>
+# Line format: <name-in-lib/firmware/brcm> <path-in-source>
 #
-# Источник — репозиторий Armbian на пиннутом коммите (см. ARMBIAN_COMMIT в
-# scripts/fetch-firmware.sh). Взято именно оттуда, а не из linux-firmware,
-# по одной причине: NVRAM привязан к плате, и работающим на этой плате
-# измерен именно этот набор (docs/hardware-inventory.md в marvin-research).
+# The source is the Armbian repository at a pinned commit (see ARMBIAN_COMMIT
+# in scripts/fetch-firmware.sh). Taken from there rather than from
+# linux-firmware for one reason: the NVRAM is board-specific, and this exact
+# set is the one measured working on this board
+# (docs/hardware-inventory.md in marvin-research).
 #
-# Имена в левой колонке заданы тем, что запрашивает драйвер: brcmfmac ищет
-# <chip>-sdio.bin, <chip>-sdio.clm_blob и <chip>-sdio.<compatible>.txt, где
-# compatible берётся из device-tree — у нас "sinovoip,bpi-m4-zero".
+# The names in the left column are dictated by what the driver asks for:
+# brcmfmac looks up <chip>-sdio.bin, <chip>-sdio.clm_blob and
+# <chip>-sdio.<compatible>.txt, where compatible comes from the device tree —
+# "sinovoip,bpi-m4-zero" in our case.
 #
-# Лицензия: firmware Cypress/Broadcom, распространяется в бинарном виде.
-# Условия проверить и зафиксировать в docs/licensing.md — TODO(build).
+# License: Cypress/Broadcom firmware, distributed in binary form. Terms to be
+# checked and recorded in docs/licensing.md — TODO(build).
 
 brcmfmac43455-sdio.bin packages/bsp/bananapi/brcm/cyfmac43455-sdio.bin
 brcmfmac43455-sdio.clm_blob packages/bsp/bananapi/brcm/cyfmac43455-sdio.1LC.clm_blob

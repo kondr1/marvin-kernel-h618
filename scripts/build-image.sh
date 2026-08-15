@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
-# Сборка контейнера сборки и фиксация его digest.
+# Builds the build container and pins its digest.
 #
-# Образ потребляется по digest, а не по тегу (ADR-0020): тег может уехать,
-# digest — нет. Этот скрипт собирает образ локально и записывает digest в
-# container.digest; в CI то же делает workflow при изменении Dockerfile.
+# The image is consumed by digest, not by tag (ADR-0020): a tag can move, a
+# digest cannot. This script builds the image locally and writes the digest to
+# container.digest; in CI the same is done by the workflow whenever the
+# Dockerfile changes.
 set -euo pipefail
 
 root=$(cd "$(dirname "$0")/.." && pwd)
@@ -12,9 +13,9 @@ tag=${TAG:-local}
 
 docker build -t "$image:$tag" "$root"
 
-# У локально собранного образа нет digest реестра, поэтому фиксируем ID.
-# После публикации в ghcr.io сюда пишется именно digest из реестра.
+# A locally built image has no registry digest, so we pin its ID instead. Once
+# published to ghcr.io, it is the registry digest that gets written here.
 id=$(docker image inspect --format '{{.Id}}' "$image:$tag")
 echo "$id" > "$root/container.digest"
-echo "образ: $image:$tag"
+echo "image: $image:$tag"
 echo "digest: $id"
