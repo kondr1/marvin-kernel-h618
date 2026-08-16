@@ -62,6 +62,18 @@ for opt in $required; do
 		fail "option $opt is not enabled in the resulting .config"
 done
 
+# Options that must stay off. Enabling one of these does not break the build —
+# it breaks the board, and only at runtime.
+forbidden="
+CONFIG_RESET_GPIO
+"
+
+for opt in $forbidden; do
+	if grep -qE "^$opt=(y|m)$" "$config"; then
+		fail "option $opt is enabled; see config/wifi.config for why it must not be"
+	fi
+done
+
 # DEBUG_INFO_REDUCED strips out the very types pahole builds BTF from.
 if grep -qE "^CONFIG_DEBUG_INFO_REDUCED=y$" "$config"; then
 	fail "CONFIG_DEBUG_INFO_REDUCED=y — BTF would be incomplete"
