@@ -6,9 +6,19 @@
 #
 # console=ttyS0: on the H618, UART0 is driven by 8250_dw, not by pl011. The
 # baud rate must match chosen/stdout-path in the DTS.
+#
+# console=ttyGS0 is the serial gadget on the OTG port: plugged into a PC the
+# board shows up as a COM port. It is listed last so it becomes /dev/console.
+# The debug UART header on this board is not populated, so on an unmodified
+# board this is the only console there is — and printk replays the whole
+# buffer into a console registered this late, so nothing before enumeration is
+# lost except what the bootloader itself printed.
+#
+# ttyS0 stays first: it costs nothing and is the only thing that can show SPL
+# and U-Boot output once someone solders the header.
 
 setenv fdtfile allwinner/sun50i-h618-bananapi-m4-zero.dtb
-setenv bootargs console=ttyS0,115200 earlycon rootwait panic=10
+setenv bootargs console=ttyS0,115200 console=ttyGS0 earlycon rootwait panic=10
 
 echo "Marvin: booting ${fdtfile}"
 
