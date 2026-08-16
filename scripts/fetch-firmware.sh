@@ -71,9 +71,15 @@ deb="$tmp/wireless-regdb.deb"
 curl -fsSL -o "$deb" \
 	"https://deb.debian.org/debian/pool/main/w/wireless-regdb/wireless-regdb_${REGDB_VERSION}_all.deb"
 
-(cd "$tmp" && ar x "$deb" && tar -xf data.tar.* ./lib/firmware/regulatory.db ./lib/firmware/regulatory.db.p7s)
+# Debian ships two variants side by side and picks between them with
+# alternatives. We take the upstream one: the kernel is built with
+# USE_KERNEL_REGDB_KEYS, so it verifies the signature against the upstream
+# wireless-regdb key, and the Debian-signed variant would be rejected.
+(cd "$tmp" && ar x "$deb" && tar -xf data.tar.* \
+	./usr/lib/firmware/regulatory.db-upstream \
+	./usr/lib/firmware/regulatory.db.p7s-upstream)
 for f in regulatory.db regulatory.db.p7s; do
-	cp "$tmp/lib/firmware/$f" "$fwroot/$f"
+	cp "$tmp/usr/lib/firmware/$f-upstream" "$fwroot/$f"
 	sha=$(sha256sum "$fwroot/$f" | cut -d' ' -f1)
 	printf '%s  %s\n' "$sha" "$f" >> "$tmp/computed.sha256"
 	printf '  %s (%s bytes)\n' "$f" "$(stat -c%s "$fwroot/$f")"
