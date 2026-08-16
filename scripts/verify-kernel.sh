@@ -57,6 +57,23 @@ CONFIG_LEDS_GPIO
 CONFIG_LEDS_TRIGGER_HEARTBEAT
 "
 
+# Options the kernel loads on demand through request_module. There is no
+# /sbin/modprobe on gokrazy, so these have to be built in: as modules they are
+# present in the image and still unreachable at the moment they are needed.
+builtin="
+CONFIG_CRYPTO_CCM
+CONFIG_CRYPTO_CMAC
+CONFIG_CRYPTO_SHA256
+CONFIG_NFT_CHAIN_NAT
+CONFIG_NFT_MASQ
+CONFIG_NF_NAT
+"
+
+for opt in $builtin; do
+	grep -qE "^$opt=y$" "$config" ||
+		fail "option $opt must be built in (=y): nothing can modprobe it at runtime"
+done
+
 for opt in $required; do
 	grep -qE "^$opt=(y|m)$" "$config" ||
 		fail "option $opt is not enabled in the resulting .config"
