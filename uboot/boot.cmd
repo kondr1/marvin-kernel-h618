@@ -24,8 +24,19 @@ setenv consoles "console=ttyS0,115200 console=ttyGS0 earlycon"
 
 if load mmc 0:1 ${kernel_addr_r} vmlinuz; then
 	echo "Marvin: gokrazy image"
-	part uuid mmc 0:2 rootpartuuid
-	setenv bootargs "${consoles} root=PARTUUID=${rootpartuuid} rootwait init=/gokrazy/init panic=10 oops=panic"
+	# Корень задаётся именем устройства, а PARTUUID — только если U-Boot
+	# смог его отдать. Обратный порядок опаснее, чем кажется: `part uuid`
+	# зависит от CONFIG_PARTITION_UUIDS, и без него переменная остаётся
+	# пустой, ядро получает `root=PARTUUID=` и вместе с `rootwait` ждёт
+	# корень вечно — молча, продолжая мигать светодиодом.
+	setenv rootdev /dev/mmcblk0p2
+	if part uuid mmc 0:2 rootpartuuid; then
+		if test -n "${rootpartuuid}"; then
+			setenv rootdev "PARTUUID=${rootpartuuid}"
+		fi
+	fi
+	echo "Marvin: root=${rootdev}"
+	setenv bootargs "${consoles} root=${rootdev} rootwait init=/gokrazy/init panic=10 oops=panic"
 	load mmc 0:1 ${fdt_addr_r} ${fdtfile} || load mmc 0:1 ${fdt_addr_r} allwinner/${fdtfile}
 else
 	echo "Marvin: bring-up card, no root file system"

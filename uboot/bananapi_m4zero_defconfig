@@ -36,3 +36,9 @@ CONFIG_AXP313_POWER=y
 CONFIG_USB_EHCI_HCD=y
 CONFIG_USB_OHCI_HCD=y
 CONFIG_USB_MUSB_GADGET=y
+
+# The boot script asks U-Boot for the root partition UUID. Without these the
+# subcommand silently yields nothing, the kernel gets an empty root= and hangs
+# on rootwait — a failure that looks exactly like a healthy boot from outside.
+CONFIG_CMD_PART=y
+CONFIG_PARTITION_UUIDS=y
