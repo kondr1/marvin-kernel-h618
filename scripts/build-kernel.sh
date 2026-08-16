@@ -113,8 +113,17 @@ cp "$build/.config" "$out/config"
 cp "$build/System.map" "$out/System.map"
 cp "$build/arch/arm64/boot/dts/allwinner/$board_dtb.dtb" "$out/"
 
+# INSTALL_MOD_STRIP drops DWARF from the modules. BTF is what dae needs and it
+# lives in vmlinux, not in the modules; the debug info is dead weight that the
+# BTF build requires during compilation and nothing reads afterwards. Measured:
+# it is the difference between a ~1 GB and a ~100 MB root file system.
 make -C "$src" O="$build" ARCH="$ARCH" CROSS_COMPILE="$CROSS_COMPILE" \
-	INSTALL_MOD_PATH="$out" modules_install >/dev/null
+	INSTALL_MOD_PATH="$out" INSTALL_MOD_STRIP=1 modules_install >/dev/null
+
+# modules_install leaves build/ and source/ symlinks pointing at the kernel
+# tree, which does not exist outside this container. The gokrazy packer walks
+# lib/modules and stats every entry, so a dangling link aborts the image build.
+find "$out/lib/modules" -maxdepth 2 \( -name build -o -name source \) -type l -delete
 
 vmlinuz_sha=$(sha256sum "$out/vmlinuz" | cut -d' ' -f1)
 

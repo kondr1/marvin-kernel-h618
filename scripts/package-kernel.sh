@@ -64,6 +64,23 @@ fi
 cp "$uboot_out/u-boot-sunxi-with-spl.bin" "$pkg/"
 cp "$uboot_out/boot.scr" "$pkg/"
 
+# The packer reads both files out of the KernelPackage and refuses to build an
+# image without them, whatever the board is.
+#
+# cmdline.txt is the base command line; the packer rewrites root= to the
+# PARTUUID it generates and appends the console settings from the instance
+# config, so the consoles are deliberately absent here.
+cat > "$pkg/cmdline.txt" <<'EOF'
+root=/dev/mmcblk0p2 init=/gokrazy/init rootwait panic=10 oops=panic
+EOF
+
+# config.txt is read only by the Raspberry Pi bootloader and means nothing on
+# Allwinner, but the packer still requires the file to exist.
+cat > "$pkg/config.txt" <<'EOF'
+# Read only by the Raspberry Pi bootloader; present because the gokrazy packer
+# requires the file regardless of board.
+EOF
+
 # The KernelPackage path has to be a valid Go package, even though it holds no
 # code.
 cat > "$pkg/kernel.go" <<'EOF'

@@ -20,9 +20,15 @@ fail() {
 # Mandatory contents. u-boot-sunxi-with-spl.bin is read by gok out of the
 # package and written to the disk's raw area at an 8 KiB offset (slug
 # nanopi_neo).
-for f in vmlinuz boot.scr u-boot-sunxi-with-spl.bin kernel.go kernelpackage.yaml; do
+for f in vmlinuz boot.scr u-boot-sunxi-with-spl.bin kernel.go kernelpackage.yaml \
+	cmdline.txt config.txt; do
 	[ -f "$pkg/$f" ] || fail "missing $f"
 done
+
+# A dangling symlink under lib/modules aborts the image build: the packer walks
+# the tree and stats every entry. modules_install creates exactly such links.
+dangling=$(find "$pkg/lib/modules" -xtype l 2>/dev/null | head -5)
+[ -z "$dangling" ] || fail "dangling symlinks in lib/modules: $dangling"
 
 ls "$pkg"/*.dtb >/dev/null 2>&1 || fail "no DTB at all"
 
