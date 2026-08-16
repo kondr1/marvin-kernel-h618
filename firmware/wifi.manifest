@@ -16,3 +16,10 @@
 
 armbian-firmware rtw88/rtw8812a_fw.bin rtw88/rtw8812a_fw.bin
 armbian-firmware rtlwifi/rtl8188eufw.bin rtlwifi/rtl8188eufw.bin
+
+# The regulatory database is fetched separately, in fetch-firmware.sh: the
+# Armbian mirror does not carry it, and Debian ships the upstream release from
+# a pinnable URL. Its absence is not cosmetic — the kernel is built with
+# REQUIRE_SIGNED_REGDB, so without the database and its signature the
+# regulatory domain stays world-wide ("00"), 5 GHz becomes passive-scan only,
+# and hostapd cannot bring up an access point there at all.

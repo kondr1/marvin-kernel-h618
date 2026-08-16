@@ -51,6 +51,13 @@ done
 ls "$pkg"/lib/firmware/brcm/brcmfmac43455-sdio.*.txt >/dev/null 2>&1 ||
 	fail "missing board NVRAM brcmfmac43455-sdio.<compatible>.txt"
 
+# Without the signed regulatory database the domain stays world-wide and no
+# access point can be brought up on 5 GHz — a driver-shaped failure caused by
+# a missing file.
+for fw in regulatory.db regulatory.db.p7s; do
+	[ -f "$pkg/lib/firmware/$fw" ] || fail "missing $fw"
+done
+
 # An arm64 kernel carries the 'ARM\x64' magic at offset 56 — a quick check that
 # this really is an image of the right architecture and not some stray file.
 if [ -f "$pkg/vmlinuz" ]; then

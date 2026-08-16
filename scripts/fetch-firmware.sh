@@ -12,6 +12,7 @@
 set -euo pipefail
 
 ARMBIAN_COMMIT=${ARMBIAN_COMMIT:-f49ca1169c8eaea80658de3752ab6e2b4bc1ac40}
+REGDB_VERSION=${REGDB_VERSION:-2026.05.30-1}
 FIRMWARE_COMMIT=${FIRMWARE_COMMIT:-d9846710f54da5e4383e2d67311819659ac2cf5c}
 BASE="https://raw.githubusercontent.com/armbian/build/$ARMBIAN_COMMIT"
 FW_BASE="https://raw.githubusercontent.com/armbian/firmware/$FIRMWARE_COMMIT"
@@ -57,6 +58,26 @@ while read -r origin source target; do
 	printf '%s  %s\n' "$sha" "$target" >> "$tmp/computed.sha256"
 	printf '  %s (%s bytes)\n' "$target" "$(stat -c%s "$fwroot/$target")"
 done < "$wifi_manifest"
+
+printf '\n== Regulatory database (Debian %s)\n' "$REGDB_VERSION"
+# Not from the Armbian mirror: it does not carry the file. Debian ships the
+# upstream wireless-regdb release unchanged, from a URL that stays valid and
+# can be pinned by version and checksum.
+#
+# The kernel is built with REQUIRE_SIGNED_REGDB, so the signature is not
+# optional — without the pair the regulatory domain stays world-wide and 5 GHz
+# is unusable for an access point.
+deb="$tmp/wireless-regdb.deb"
+curl -fsSL -o "$deb" \
+	"https://deb.debian.org/debian/pool/main/w/wireless-regdb/wireless-regdb_${REGDB_VERSION}_all.deb"
+
+(cd "$tmp" && ar x "$deb" && tar -xf data.tar.* ./lib/firmware/regulatory.db ./lib/firmware/regulatory.db.p7s)
+for f in regulatory.db regulatory.db.p7s; do
+	cp "$tmp/lib/firmware/$f" "$fwroot/$f"
+	sha=$(sha256sum "$fwroot/$f" | cut -d' ' -f1)
+	printf '%s  %s\n' "$sha" "$f" >> "$tmp/computed.sha256"
+	printf '  %s (%s bytes)\n' "$f" "$(stat -c%s "$fwroot/$f")"
+done
 
 # Same principle as with the sources: pinning only works if the checksums live
 # in the repository. The first download prints them, later runs compare.
