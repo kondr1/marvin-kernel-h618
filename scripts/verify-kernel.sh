@@ -69,9 +69,21 @@ CONFIG_NFT_MASQ
 CONFIG_NF_NAT
 "
 
+# Options needed before userspace can load anything. gokrazy's init opens
+# /dev/watchdog once at startup; as a module the driver arrives seconds later and
+# the appliance runs with no watchdog at all.
+builtin_early="
+CONFIG_SUNXI_WATCHDOG
+"
+
 for opt in $builtin; do
 	grep -qE "^$opt=y$" "$config" ||
 		fail "option $opt must be built in (=y): nothing can modprobe it at runtime"
+done
+
+for opt in $builtin_early; do
+	grep -qE "^$opt=y$" "$config" ||
+		fail "option $opt must be built in (=y): it is needed before userspace loads modules"
 done
 
 for opt in $required; do
