@@ -37,7 +37,7 @@ while read -r target source; do
 	'#'* | '') continue ;;
 	esac
 
-	curl -fsSL -o "$tmp/$(basename "$target")" "$BASE/$source"
+	curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors -o "$tmp/$(basename "$target")" "$BASE/$source"
 	cp "$tmp/$(basename "$target")" "$out/$target"
 
 	sha=$(sha256sum "$out/$target" | cut -d' ' -f1)
@@ -52,7 +52,7 @@ while read -r origin source target; do
 	esac
 
 	mkdir -p "$fwroot/$(dirname "$target")"
-	curl -fsSL -o "$fwroot/$target" "$FW_BASE/$source"
+	curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors -o "$fwroot/$target" "$FW_BASE/$source"
 
 	sha=$(sha256sum "$fwroot/$target" | cut -d' ' -f1)
 	printf '%s  %s\n' "$sha" "$target" >> "$tmp/computed.sha256"
@@ -68,7 +68,7 @@ printf '\n== Regulatory database (Debian %s)\n' "$REGDB_VERSION"
 # optional — without the pair the regulatory domain stays world-wide and 5 GHz
 # is unusable for an access point.
 deb="$tmp/wireless-regdb.deb"
-curl -fsSL -o "$deb" \
+curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors -o "$deb" \
 	"https://deb.debian.org/debian/pool/main/w/wireless-regdb/wireless-regdb_${REGDB_VERSION}_all.deb"
 
 # Debian ships two variants side by side and picks between them with
