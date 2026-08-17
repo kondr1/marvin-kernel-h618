@@ -84,6 +84,29 @@
 	sdio: wifi@1 {
 		reg = <1>;
 		compatible = "brcm,bcm4329-fmac";
+
+		/*
+		 * Country code translation for the firmware.
+		 *
+		 * The NVRAM shipped for this board sets ccode=0 — no country at
+		 * all — and the firmware then reports country 99 and rejects every
+		 * 5 GHz channel, measured as
+		 *
+		 *   brcmf_cfg80211_start_ap: Set Channel failed: chspec=53284, -52
+		 *
+		 * even though BCM43455 and the board are both dual-band. The band
+		 * is closed by configuration, not by hardware.
+		 *
+		 * brcmfmac forwards a regulatory hint to the firmware only after
+		 * translating the ISO code through this map. The mapping is trivial
+		 * (ISO code, revision 0), which is what vendor device trees for this
+		 * chip carry; extend the list as other regions are needed.
+		 *
+		 * Hypothesis until confirmed on hardware: with a country the firmware
+		 * accepts, 5 GHz channels appear and hostapd can use them.
+		 */
+		brcm,ccode-map = "RU-RU-0", "US-US-0", "DE-DE-0", "GB-GB-0",
+				 "FR-FR-0", "PL-PL-0", "KZ-KZ-0", "TR-TR-0";
 	};
 };
 
